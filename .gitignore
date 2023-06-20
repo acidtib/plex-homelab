@@ -1,0 +1,2 @@
+/data/minio_fs/*
+!/data/minio_fs/.keep

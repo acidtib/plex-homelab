@@ -1,0 +1,94 @@
+version: "3"
+
+volumes:
+  minio-data: null
+  plex-config: null
+
+networks:
+  default:
+    driver: bridge
+
+services:
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    privileged: true
+    ports:
+      - "32400:32400"
+      - "1900:1900/udp"
+      - "3005:3005"
+      - "5353:5353/udp"
+      - "8324:8324"
+      - "32410:32410/udp"
+      - "32412:32412/udp"
+      - "32413:32413/udp"
+      - "32414:32414/udp"
+      - "32469:32469"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - VERSION=docker
+      # - PLEX_CLAIM=optional
+    depends_on:
+      - minio
+      - goofys
+    volumes:
+      - plex-config:/config
+      - './data/minio_fs:/mnt/s3:shared'
+    restart: unless-stopped
+    networks:
+      default:
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+    volumes:
+      - minio-data:/data
+    command: server --address ":9001" --console-address ":9000" /data
+    restart: unless-stopped
+    networks:
+      default:
+
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add --insecure s3minio http://minio:9001 admin password;
+      /usr/bin/mc mb --insecure s3minio/plex;
+      exit 0;
+      "
+    networks:
+      default:
+
+  goofys:
+    container_name: goofys
+    image: cloudposse/goofys
+    privileged: true
+    environment:
+      - ENDPOINT=http://minio:9001
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=password
+      - BUCKET=plex
+      - REGION=unused 
+      - UID=1000
+      - GID=1000
+      - DIR_MODE=0777
+      - FILE_MODE=0777
+      - STAT_CACHE_TTL=0s
+      - TYPE_CACHE_TTL=0s
+    volumes:
+      - './data/minio_fs:/mnt/s3:shared'
+      - './config/fuse.conf:/etc/fuse.conf'
+    depends_on:
+      - minio
+      - createbuckets
+    networks:
+      default:
