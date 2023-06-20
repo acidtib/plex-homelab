@@ -1,4 +1,4 @@
-version: "3"
+version: '3.7'
 
 volumes:
   minio-data: null
@@ -27,7 +27,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Etc/UTC
+      - TZ=America/Denver
       - VERSION=docker
       # - PLEX_CLAIM=optional
     depends_on:
@@ -41,18 +41,31 @@ services:
 
   minio1:
     image: minio/minio:latest
+    restart: unless-stopped
+    container_name: minio1
+    hostname: minio1
     ports:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: password
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password
+      - MINIO_DISTRIBUTED_MODE_ENABLED=yes
+      - MINIO_DISTRIBUTED_NODES=minio1,minio2
+      - MINIO_SKIP_CLIENT=yes
+    extra_hosts:
+      - "minio1:192.168.0.201"  # 1st node
+      - "minio2:192.168.0.202"  # 2nd node
     volumes:
       - minio-data:/data
     command: server --address ":9001" --console-address ":9000" /data
-    restart: unless-stopped
     networks:
       default:
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
   createbuckets:
     image: minio/mc
