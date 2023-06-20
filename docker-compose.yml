@@ -31,7 +31,6 @@ services:
       - VERSION=docker
       # - PLEX_CLAIM=optional
     depends_on:
-      - minio
       - goofys
     volumes:
       - plex-config:/config
@@ -40,7 +39,7 @@ services:
     networks:
       default:
 
-  minio:
+  minio1:
     image: minio/minio:latest
     ports:
       - "9000:9000"
@@ -58,10 +57,10 @@ services:
   createbuckets:
     image: minio/mc
     depends_on:
-      - minio
+      - minio1
     entrypoint: >
       /bin/sh -c "
-      /usr/bin/mc config host add --insecure s3minio http://minio:9001 admin password;
+      /usr/bin/mc config host add --insecure s3minio http://minio1:9001 admin password;
       /usr/bin/mc mb --insecure s3minio/plex;
       exit 0;
       "
@@ -70,10 +69,10 @@ services:
 
   goofys:
     container_name: goofys
-    image: cloudposse/goofys
+    image: ghcr.io/acidtib/goofys:latest
     privileged: true
     environment:
-      - ENDPOINT=http://minio:9001
+      - ENDPOINT=http://minio1:9001
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=password
       - BUCKET=plex
@@ -84,11 +83,12 @@ services:
       - FILE_MODE=0777
       - STAT_CACHE_TTL=0s
       - TYPE_CACHE_TTL=0s
+      - MOUNT_ACCESS=allow_other,nonempty
     volumes:
-      - './data/minio_fs:/mnt/s3:shared'
       - './config/fuse.conf:/etc/fuse.conf'
+      - './data/minio_fs:/mnt/s3:shared'
     depends_on:
-      - minio
+      - minio1
       - createbuckets
     networks:
       default:
