@@ -8,11 +8,12 @@ networks:
     driver: bridge
 
 services:
-  minio2: # rename on different nodes
+  minio1: # rename on different nodes
     image: minio/minio:latest
+    command: server --address ":9001" --console-address ":9000" http://minio{1...2}/data
     restart: unless-stopped
-    container_name: minio2
-    hostname: minio2
+    container_name: minio1
+    hostname: minio1
     ports:
       - '9000:9000'
       - '9001:9001'

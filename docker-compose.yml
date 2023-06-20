@@ -1,7 +1,6 @@
 version: '3.7'
 
 volumes:
-  minio-data: null
   plex-config: null
 
 networks:
@@ -39,47 +38,6 @@ services:
     networks:
       default:
 
-  minio1:
-    image: minio/minio:latest
-    command: server --address ":9001" --console-address ":9000" http://minio{1...2}/data
-    restart: unless-stopped
-    container_name: minio1
-    hostname: minio1
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      - MINIO_ROOT_USER=admin
-      - MINIO_ROOT_PASSWORD=password
-      - MINIO_DISTRIBUTED_MODE_ENABLED=yes
-      - MINIO_DISTRIBUTED_NODES=minio1,minio2
-      - MINIO_SKIP_CLIENT=yes
-    extra_hosts:
-      - "minio1:192.168.0.201"  # 1st node
-      - "minio2:192.168.0.202"  # 2nd node
-    volumes:
-      - minio-data:/data
-    networks:
-      default:
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-
-  createbuckets:
-    image: minio/mc
-    depends_on:
-      - minio1
-    entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc config host add --insecure s3minio http://minio1:9001 admin password;
-      /usr/bin/mc mb --insecure s3minio/plex;
-      exit 0;
-      "
-    networks:
-      default:
-
   goofys:
     container_name: goofys
     image: ghcr.io/acidtib/goofys:latest
@@ -88,7 +46,7 @@ services:
       - ENDPOINT=http://minio1:9001
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=password
-      - BUCKET=plex
+      - BUCKET=plex-server
       - REGION=unused 
       - UID=1000
       - GID=1000
@@ -100,8 +58,5 @@ services:
     volumes:
       - './config/fuse.conf:/etc/fuse.conf'
       - './data/minio_fs:/mnt/s3:shared'
-    depends_on:
-      - minio1
-      - createbuckets
     networks:
       default:
